@@ -15,7 +15,8 @@ import {
   Torus,
   MeshDistortMaterial,
   useTexture,
-  Html
+  Html,
+  Cone
 } from '@react-three/drei'
 import { useControls, Leva } from 'leva'
 import { useEffect, use, useRef, Suspense } from 'react';
@@ -23,10 +24,7 @@ import { Color, Vector2, Vector3, PlaneBufferGeometry, Mesh, MeshBasicMaterial }
 
 import { useSpring, animated } from '@react-spring/three';
 
-
-
 export default function Home() {
-
 
   return (
     <div className={styles.container}>
@@ -37,7 +35,7 @@ export default function Home() {
 
       <main>
         <div id="canvas-container" style={{ width: '100vw', height: '100vh' }}>
-          <Canvas camera={{ position: [0, 0, 10], far: 100, }} >
+          <Canvas camera={{ position: [0, 0, 9.5], far: 50, }} >
             <ambientLight shadows />
 
             <Scene />
@@ -52,7 +50,7 @@ export default function Home() {
 
             {/* <Perf position="top-left" /> */}
 
-            <OrbitControls minPolarAngle={0} maxPolarAngle={Math.PI / 2} makeDefault />
+
           </Canvas>
         </div>
       </main >
@@ -86,16 +84,41 @@ export function Scene(props) {
 
 
   const { viewport, camera, gl, size } = useThree()
-  //gl.setClearColor(new Color('white'))
+
   const textRef = useRef()
-  const occludeRef = useRef()
+
   const scale = Math.min(1, viewport.width / 16)
 
-  const aspectRatio = size.width / size.height;
-  const planeHeight = camera.top - camera.bottom;
-  const planeWidth = planeHeight * aspectRatio;
+  const orbitControlsRef = useRef()
+  const startTimeRef = useRef(Date.now())
 
-  const planeTexture = useTexture('refract_gradient.png')
+  function easeInOutQuad(t) {
+    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+  }
+
+  useFrame(() => {
+    if (orbitControlsRef.current) {
+      const elapsedTime = (Date.now() - startTimeRef.current) / 1000;
+
+      if (elapsedTime <= 4) {
+        const easedProgress = easeInOutQuad((elapsedTime / 4) % 1);
+
+        const initialPolarAngle = Math.PI / 2.1;
+        const targetPolarAngle = initialPolarAngle + 0.04 * Math.sin(easedProgress * Math.PI * 2);
+        orbitControlsRef.current.setPolarAngle(targetPolarAngle);
+
+        const initialAzimuthalAngle = 0;
+        const targetAzimuthalAngle = initialAzimuthalAngle + 0.05 * Math.sin(easedProgress * Math.PI * 2);
+        orbitControlsRef.current.setAzimuthalAngle(targetAzimuthalAngle);
+
+        orbitControlsRef.current.update();
+      } else {
+        //orbitControlsRef.current.reset();
+      }
+    }
+
+
+  })
 
   useEffect(() => {
     updateObjectPosition(camera, textRef.current, gl)
@@ -126,28 +149,31 @@ export function Scene(props) {
     const direction = worldPosition.sub(camera.position).normalize();
     const finalPosition = camera.position.clone().add(direction.multiplyScalar(10))
 
+
     // Update the object's position
     object.position.copy(finalPosition);
   }
+  const textScaleFactor = Math.log2(viewport.width) / 4
+  config.scale = scale
 
-  const rotationSpring = useSpring({
-    rotation: [0, 2 * Math.PI, 0],
-    config: {
-      duration: 10000,
-      easing: (t) => t,
-    },
-    loop: { reverse: false },
-  })
+
+  const factor = Math.max(0.2, 1 - (viewport.width - 500) / 1500)
   return (
     <>
-      {/* goofy remember to remove when usin controls */}
+      <OrbitControls
+        enableZoom={false}
+        enableDamping={true}
+        minPolarAngle={Math.PI / 2.4}
+        maxPolarAngle={Math.PI / 1.9}
+        minAzimuthAngle={-Math.PI / 20}
+        maxAzimuthAngle={Math.PI / 16}
+        makeDefault
+        ref={orbitControlsRef} />
+      {/* goofy remember to remove Leva when usin controls */}
       <Leva hidden />
       <Plane
-
-
-        args={[100, 100]}
-        position={[0, 0, -10]} // Adjust Y position as needed to be behind other objects
-
+        args={[4000, 2000]}
+        position={[0, 0, -10]}
       >
         <meshBasicMaterial
           toneMapped={false}
@@ -157,34 +183,28 @@ export function Scene(props) {
         />
       </Plane>
 
-
       <Html
         fullscreen
         occlude={false}
         style={{
-          //zIndex: '-1',
           background: `url('refract_gradient.png') no-repeat center center fixed`,
           backgroundSize: '102% 102%',
           transform: 'translateY(0px)'
-
-
         }}
       />
 
       <group ref={textRef}>
 
         <Suspense>
-
           <Text
-
             // fillOpacity={.1}
             outlineColor={'#2C2C2C'}
             outlineWidth={.01}
+            position={[0, 0, -.15 * textScaleFactor]}
             anchorX="left"
             anchorY="top"
             castShadow
-            fontSize={1.3 * scale}
-
+            fontSize={1.2 * textScaleFactor}
             font={'fonts/montserrat-v25-latin-800.woff'}
             lineHeight={1.1}
             letterSpacing={.03}
@@ -197,11 +217,11 @@ export function Scene(props) {
           <Text
             fillOpacity={0}
             strokeColor='#2C2C2C'
-            position={[0, -1.2, 0]}
+            position={[0, -1.2 * textScaleFactor, 0]}
             anchorX="left"
             anchorY="top"
             castShadow
-            fontSize={1.3 * scale}
+            fontSize={1.2 * textScaleFactor}
             strokeWidth={'2.5%'}
             font={'fonts/montserrat-v25-latin-800.woff'}
             lineHeight={1.1}
@@ -214,28 +234,19 @@ export function Scene(props) {
 
         </Suspense>
 
-
-
-
-        <SpinningTorus config={config} position={[11, -2, 1.5]} />
+        {/* <SpinningTorus config={config} position={[11 * scale, -2 * scale, 1 * scale]} /> */}
 
         <Float floatingRange={[-2., 3.2]}>
-          <SpinningTorus config={config} position={[3.5, -3.5, 1.5]} />
+          <SpinningTorus config={config} position={[3.2 * scale, -3.5 * scale, 1.4 * scale]} />
         </Float>
 
-
-        {/* <Torus
-          position={[7, -4.5, 1.5]}
-        >
-
-          <MeshTransmissionMaterial  {...config} toneMapped={false} />
-        </Torus> */}
-
-        <Float floatingRange={[-1., .6]} speed={-.6} >
-          <SpinningBox config={config} />
-
+        <Float speed={-.6} >
+          <SpinningBox config={config} position={[7.85 * scale, -1.2 * scale, 1.9 * scale]} />
         </Float>
 
+        <Float floatingRange={[-1., .9]} speed={.7} rotationIntensity={1}>
+          <Pyramid config={config} position={[11 * scale, -2 * scale, 1.3 * scale]} />
+        </Float>
 
 
         {/* <SpinningCylinder config={config} /> */}
@@ -263,30 +274,11 @@ function SpinningTorus(props,) {
       args={[1, 0.4, 64, 200]}
       position={props.position}
       {...spinAnimation}
+      scale={.95 * props.config.scale}
+    //scale={1 * props.config.scale}
     >
-
       <MeshTransmissionMaterial  {...props.config} toneMapped={false} />
     </AnimatedTorus>
-
-  );
-}
-
-const AnimatedCylinder = animated(Cylinder);
-
-function SpinningCylinder(props) {
-  const spinAnimation = useSpring({
-    rotation: [Math.PI * 4, 0, Math.PI * 2],
-    from: { rotation: [0, 0, 0] },
-    config: { duration: 20000, },
-    loop: { reverse: false, reset: true }, // Loop the animation forever
-  })
-
-  return (
-    <AnimatedCylinder castShadow position={[-.2, -2.3, 0.3]}  {...spinAnimation} scale={.8} args={[1, 1, 1, 64]}>
-
-      <MeshTransmissionMaterial  {...props.config} toneMapped={false} />
-    </AnimatedCylinder>
-
 
   );
 }
@@ -295,15 +287,14 @@ const AnimatedRoundedBox = animated(RoundedBox);
 
 function SpinningBox(props) {
   const spinAnimation = useSpring({
-    rotation: [Math.PI * 4, Math.PI * 2, Math.PI * 4],
+    rotation: [Math.PI * 4, 0, Math.PI * 4],
     from: { rotation: [0, 0, 0] },
     config: { duration: 25000, },
     loop: { reverse: false, reset: true }, // Loop the animation forever
   })
 
   return (
-    <AnimatedRoundedBox {...spinAnimation} castShadow position={[7.2, -1.3, 3]} scale={.9} smoothness={32} radius={0.2}>
-
+    <AnimatedRoundedBox {...spinAnimation} castShadow position={props.position} smoothness={64} radius={0.2}>
       <MeshTransmissionMaterial  {...props.config} toneMapped={false} />
     </AnimatedRoundedBox>
 
@@ -311,3 +302,59 @@ function SpinningBox(props) {
   );
 }
 
+const AnimatedPyramid = animated(Cone)
+
+function SpinningPyramid(props) {
+  const spinAnimation = useSpring({
+    rotation: [Math.PI * 2, 0, 0],
+    from: { rotation: [0, 0, 0] },
+    config: { duration: 25000, },
+    loop: { reverse: false, reset: true }, // Loop the animation forever
+  })
+
+  const height = 2
+  const sides = 4
+  const coneHeight = height / 2
+  const coneRadius = 0.5
+  const coneSegments = 64
+  const deltaRadius = coneRadius / coneSegments
+
+  const vertices = []
+  for (let i = 0; i < coneSegments; i++) {
+    const radius = coneRadius - deltaRadius * i
+    const angle = (i / coneSegments) * Math.PI * 2
+    vertices.push(radius * Math.sin(angle), -coneHeight, radius * Math.cos(angle))
+  }
+  vertices.push(0, coneHeight, 0)
+
+  return (
+    <AnimatedPyramid {...spinAnimation} args={[0.5, 1, coneSegments, 6]} vertices={vertices} position={props.position} scale={2}>
+      <MeshTransmissionMaterial  {...props.config} toneMapped={false} />
+    </AnimatedPyramid>
+  )
+}
+
+
+
+function Pyramid(props) {
+  const height = 2
+  const sides = 4
+  const coneHeight = height / 2
+  const coneRadius = 0.5
+  const coneSegments = 64
+  const deltaRadius = coneRadius / coneSegments
+
+  const vertices = []
+  for (let i = 0; i < coneSegments; i++) {
+    const radius = coneRadius - deltaRadius * i
+    const angle = (i / coneSegments) * Math.PI * 2
+    vertices.push(radius * Math.sin(angle), -coneHeight, radius * Math.cos(angle))
+  }
+  vertices.push(0, coneHeight, 0)
+
+  return (
+    <Cone args={[0.5, 1, coneSegments, 6]} vertices={vertices} position={props.position} scale={1.5}>
+      <MeshTransmissionMaterial  {...props.config} toneMapped={false} />
+    </Cone>
+  )
+}
