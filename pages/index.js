@@ -23,6 +23,7 @@ import { useEffect, use, useRef, Suspense } from 'react';
 import { Color, Vector2, Vector3, PlaneBufferGeometry, Mesh, MeshBasicMaterial } from 'three';
 
 import { useSpring, animated } from '@react-spring/three';
+import { render } from 'react-dom';
 
 export default function Home() {
 
@@ -135,33 +136,41 @@ export function Scene(props) {
 
 
   function updateObjectPosition(camera, object, renderer) {
-    const topLeftOffset = new Vector2(50, 140); // Adjust these values to control the position relative to the top-left corner (in pixels)
+    // const topLeftOffset = new Vector2(60, 120) // Adjust these values to control the position relative to the top-left corner (in pixels)
+
+    //const xOffset = 60
+    const screenHeight = renderer.domElement.clientHeight
+    const screenWidth = renderer.domElement.clientWidth
+    const yOffset = screenHeight >= 900 ? 160 : 0 + (screenHeight - 375) * (130 / (900 - 375))
+    const xOffset = screenWidth >= 900 ? 60 : 20 + (screenWidth - 375) * (40 / (900 - 375))
+    const topLeftOffset = new Vector2(xOffset, yOffset)
 
     // Calculate the screen space position
-    const screenPosition = new Vector2(-1, 1);
-    screenPosition.x += (topLeftOffset.x / renderer.domElement.clientWidth) * 2;
-    screenPosition.y -= (topLeftOffset.y / renderer.domElement.clientHeight) * 2;
+    const screenPosition = new Vector2(-1, 1)
+    screenPosition.x += (topLeftOffset.x / renderer.domElement.clientWidth) * 2
+    screenPosition.y -= (topLeftOffset.y / renderer.domElement.clientHeight) * 2
 
     // Calculate the world position
-    const worldPosition = new Vector3(screenPosition.x, screenPosition.y, 0.5);
+    const worldPosition = new Vector3(screenPosition.x, screenPosition.y, 0.5)
     worldPosition.unproject(camera);
 
-    const direction = worldPosition.sub(camera.position).normalize();
+    const direction = worldPosition.sub(camera.position).normalize()
     const finalPosition = camera.position.clone().add(direction.multiplyScalar(10))
 
-
     // Update the object's position
-    object.position.copy(finalPosition);
+    object.position.copy(finalPosition)
   }
+
   const textScaleFactor = Math.log2(viewport.width) / 4
   config.scale = scale
 
 
-  const factor = Math.max(0.2, 1 - (viewport.width - 500) / 1500)
+
   return (
     <>
       <OrbitControls
         enableZoom={false}
+        enablePan={false}
         enableDamping={true}
         minPolarAngle={Math.PI / 2.4}
         maxPolarAngle={Math.PI / 1.9}
@@ -204,7 +213,7 @@ export function Scene(props) {
             anchorX="left"
             anchorY="top"
             castShadow
-            fontSize={1.2 * textScaleFactor}
+            fontSize={1.1 * textScaleFactor}
             font={'fonts/montserrat-v25-latin-800.woff'}
             lineHeight={1.1}
             letterSpacing={.03}
@@ -221,7 +230,7 @@ export function Scene(props) {
             anchorX="left"
             anchorY="top"
             castShadow
-            fontSize={1.2 * textScaleFactor}
+            fontSize={1.1 * textScaleFactor}
             strokeWidth={'2.5%'}
             font={'fonts/montserrat-v25-latin-800.woff'}
             lineHeight={1.1}
@@ -234,26 +243,19 @@ export function Scene(props) {
 
         </Suspense>
 
-        {/* <SpinningTorus config={config} position={[11 * scale, -2 * scale, 1 * scale]} /> */}
-
-        <Float floatingRange={[-2., 3.2]}>
-          <SpinningTorus config={config} position={[3.2 * scale, -3.5 * scale, 1.4 * scale]} />
+        <Float floatingRange={[-.7, 3.2]}>
+          <SpinningTorus config={config} position={[2.2 * scale, -3.5 * scale, -1.9 * scale]} />
         </Float>
 
-        <Float speed={-.6} >
-          <SpinningBox config={config} position={[7.85 * scale, -1.2 * scale, 1.9 * scale]} />
+        <Float speed={1} floatingRange={[-.3, 1.5]} >
+          <SpinningBox config={config} position={[6.85 * scale, -.9 * scale, -2.5 * scale]} />
         </Float>
 
-        <Float floatingRange={[-1., .9]} speed={.7} rotationIntensity={1}>
+        <Float floatingRange={[-.5, 2.3]}  >
           <Pyramid config={config} position={[11 * scale, -2 * scale, 1.3 * scale]} />
         </Float>
 
-
-        {/* <SpinningCylinder config={config} /> */}
-
-
-
-      </group>
+      </group >
 
     </>
   )
@@ -274,7 +276,7 @@ function SpinningTorus(props,) {
       args={[1, 0.4, 64, 200]}
       position={props.position}
       {...spinAnimation}
-      scale={.95 * props.config.scale}
+      scale={1 * props.config.scale}
     //scale={1 * props.config.scale}
     >
       <MeshTransmissionMaterial  {...props.config} toneMapped={false} />
@@ -302,38 +304,6 @@ function SpinningBox(props) {
   );
 }
 
-const AnimatedPyramid = animated(Cone)
-
-function SpinningPyramid(props) {
-  const spinAnimation = useSpring({
-    rotation: [Math.PI * 2, 0, 0],
-    from: { rotation: [0, 0, 0] },
-    config: { duration: 25000, },
-    loop: { reverse: false, reset: true }, // Loop the animation forever
-  })
-
-  const height = 2
-  const sides = 4
-  const coneHeight = height / 2
-  const coneRadius = 0.5
-  const coneSegments = 64
-  const deltaRadius = coneRadius / coneSegments
-
-  const vertices = []
-  for (let i = 0; i < coneSegments; i++) {
-    const radius = coneRadius - deltaRadius * i
-    const angle = (i / coneSegments) * Math.PI * 2
-    vertices.push(radius * Math.sin(angle), -coneHeight, radius * Math.cos(angle))
-  }
-  vertices.push(0, coneHeight, 0)
-
-  return (
-    <AnimatedPyramid {...spinAnimation} args={[0.5, 1, coneSegments, 6]} vertices={vertices} position={props.position} scale={2}>
-      <MeshTransmissionMaterial  {...props.config} toneMapped={false} />
-    </AnimatedPyramid>
-  )
-}
-
 
 
 function Pyramid(props) {
@@ -353,7 +323,12 @@ function Pyramid(props) {
   vertices.push(0, coneHeight, 0)
 
   return (
-    <Cone args={[0.5, 1, coneSegments, 6]} vertices={vertices} position={props.position} scale={1.5}>
+    <Cone
+      args={[0.5, 1, coneSegments, 6]}
+      vertices={vertices}
+      position={props.position}
+      scale={1.2}
+      rotation={[Math.PI / 3, 0, Math.PI / 4]}>
       <MeshTransmissionMaterial  {...props.config} toneMapped={false} />
     </Cone>
   )
